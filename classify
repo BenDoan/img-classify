@@ -2,48 +2,103 @@
 import sys
 from PySide import QtGui, QtCore
 import os
+from os import path
+import logging
 
-class ImageViewer(QtGui.QWidget):
-
+#class ImageViewer(QtGui.QWidget):
+class ImageViewer(QtGui.QMainWindow):
     def __init__(self):
         super(ImageViewer, self).__init__()
         self.initUI()
 
     def initUI(self):
+        self.is_image_init = False
+        self.is_updating = False
 
-        main_layout = QtGui.QVBoxLayout()
-        self.setLayout(main_layout)
+        #self.statusBar().showMessage('Ready')
+        self.makeMenu()
 
-        self.image = QtGui.QImage(100, 150, QtGui.QImage.Format_ARGB32)
-        self.image.scaledToWidth(200)
-        self.image.load('/home/ben/code/st/shuttle.jpg')
+        widget = QtGui.QWidget()
+        self.setCentralWidget(widget)
+        self.vbox = QtGui.QVBoxLayout()
+        self.vbox.setContentsMargins(5,5,5,5)
 
-        self.image_label = QtGui.QLabel("")
-        self.image_label.setPixmap(QtGui.QPixmap.fromImage(self.image).scaledToWidth(600))
+        self.fname = "/home/ben/code/st/shuttle.jpg"
+        self.loadImage(self.fname)
 
-        button = QtGui.QPushButton('Shuttle', self)
-        main_layout.addWidget(button)
-        button = QtGui.QPushButton('No Shuttle', self)
-        main_layout.addWidget(button)
-        main_layout.addWidget(self.image_label)
+        widget.setLayout(self.vbox)
 
-        self.setGeometry(300, 300, 600, 30)
-        self.setWindowTitle('image_viewer')
+        self.setGeometry(300, 300, 600, 150)
+        self.setWindowTitle('Image Classifier')
 
-        QtGui.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Right), self, lambda: self.fire("Right"))
-        QtGui.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Left), self, lambda: self.fire("Left"))
+        self.makeShortcuts()
 
         self.show()
 
+    def showFileDialog(self):
+        self.fname, _ = QtGui.QFileDialog.getOpenFileName(self, 'Open Image', path.expanduser("~"))
+        self.loadImage(self.fname)
+        #dirname = QtGui.QFileDialog.getExistingDirectory(self, 'Open Image', path.expanduser("~"))
+        #self.files = list(filter(lambda x: fnmatch.fnmatch(x, "*.jpg"), os.listdir(dirname)))
+
+    def loadImage(self, path):
+        print(self.is_image_init)
+        print(self.fname)
+        if self.is_image_init:
+            self.imageUpdate(path)
+        else:
+            self.imageInit(path)
+
+    def imageUpdate(self, path):
+        #self.image.load(path)
+        #self.pixmap = QtGui.QPixmap.fromImage(self.image).scaledToWidth(600)
+        self.is_updating = True
+        self.image_label.deleteLater()
+        self.imageInit(path)
+        self.is_updating = False
+
+    def imageInit(self, path):
+        self.image = QtGui.QImage(100, 150, QtGui.QImage.Format_ARGB32)
+        self.image.load(path)
+
+        self.image_label = QtGui.QLabel("")
+        self.image_label.setScaledContents(True)
+        self.pixmap = QtGui.QPixmap.fromImage(self.image).scaledToWidth(600)
+        self.image_label.setPixmap(self.pixmap)
+        self.vbox.addWidget(self.image_label)
+        self.is_image_init = True
+
+    def makeMenu(self):
+        openFile = QtGui.QAction(QtGui.QIcon('open.png'), 'Open', self)
+        openFile.setShortcut('Ctrl+O')
+        openFile.setStatusTip('Open new File')
+        openFile.triggered.connect(self.showFileDialog)
+
+        exitAction = QtGui.QAction(QtGui.QIcon('exit.png'), '&Exit', self)
+        exitAction.setShortcut('Ctrl+Q')
+        exitAction.setStatusTip('Exit application')
+        exitAction.triggered.connect(self.close)
+
+
+        menubar = self.menuBar()
+        fileMenu = menubar.addMenu('&File')
+        fileMenu.addAction(openFile)
+        fileMenu.addAction(exitAction)
+
+    def makeShortcuts(self):
+        QtGui.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Right), self, lambda: self.fire("Right"))
+        QtGui.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Left), self, lambda: self.fire("Left"))
+
     def paintEvent(self, e):
-        w = e.rect().width()
-        self.image_label.setPixmap(QtGui.QPixmap.fromImage(self.image).scaledToWidth(w-30))
+        if not self.is_updating:
+            s = e.rect().size()
+            self.pixmap = QtGui.QPixmap(self.fname).scaled(s, QtCore.Qt.KeepAspectRatioByExpanding)
+            self.image_label.setPixmap(self.pixmap)
 
     def fire(self, position):
         print("Firing %s" % position)
 
 def main():
-
     app = QtGui.QApplication(sys.argv)
     ex = ImageViewer()
     sys.exit(app.exec_())
